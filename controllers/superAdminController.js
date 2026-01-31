@@ -47,7 +47,9 @@ const addLeadFaculty = async (req, res) => {
         // Update College with Lead Faculty
         await College.findByIdAndUpdate(collegeId, { leadFaculty: user._id });
 
+        console.log(`📧 Attempting to send email to ${email}...`);
         const emailResult = await sendCredentialsEmail(email, name, password, 'Lead Faculty');
+        console.log(`📧 Email result:`, emailResult);
 
         res.status(201).json({
             message: emailResult.success ? 'Lead Faculty added and email sent successfully' : `Lead Faculty added but email failed: ${emailResult.error}`,

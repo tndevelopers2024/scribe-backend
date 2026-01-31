@@ -9,7 +9,7 @@ const sendCredentialsEmail = async (email, name, password, role) => {
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
         console.warn('⚠️ Missing EMAIL_USER or EMAIL_PASS environment variables.');
         logMockEmail(email, password);
-        return false;
+        return { success: false, error: 'Missing EMAIL_USER or EMAIL_PASS environment variables' };
     }
 
     try {
@@ -20,8 +20,16 @@ const sendCredentialsEmail = async (email, name, password, role) => {
             auth: {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASS
-            }
+            },
+            connectionTimeout: 10000, // 10 seconds
+            greetingTimeout: 10000,
+            socketTimeout: 10000
         });
+
+        // Verify connection before sending
+        console.log('🔄 Verifying SMTP connection...');
+        await transporter.verify();
+        console.log('✅ SMTP connection verified');
 
         const mailOptions = {
             from: process.env.EMAIL_USER, // Simplified to exactly match test-email.js
