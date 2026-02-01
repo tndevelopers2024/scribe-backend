@@ -22,7 +22,8 @@ const corsOptions = {
             'http://localhost:5173',
             'http://localhost:3000',
             'https://scribe-frontend.vercel.app',
-            'https://scribe-frontend-*.vercel.app' // Allow all Vercel preview deployments
+            'https://scribe-frontend-*.vercel.app',
+            'https://bioethics-eportfolio.com' // Allow all Vercel preview deployments
         ];
 
         // Allow requests with no origin (like mobile apps or curl requests)
