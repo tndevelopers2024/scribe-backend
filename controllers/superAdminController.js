@@ -35,13 +35,27 @@ const addLeadFaculty = async (req, res) => {
         }
 
         const password = generatePassword();
+        const nameParts = name ? name.split(' ') : [];
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+        const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
+
+        // Get college name for institution initialization
+        const college = await College.findById(collegeId);
+
         const user = await User.create({
             name,
             email,
             password,
             role: 'Lead Faculty',
             college: collegeId,
-            assignedBy: req.user._id
+            assignedBy: req.user._id,
+            profile: {
+                firstName,
+                middleName,
+                lastName,
+                institution: college ? college.name : ''
+            }
         });
 
         // Update College with Lead Faculty
@@ -77,6 +91,11 @@ const addFaculty = async (req, res) => {
         }
 
         const password = generatePassword();
+        const nameParts = name ? name.split(' ') : [];
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+        const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
+
         const user = await User.create({
             name,
             email,
@@ -84,7 +103,13 @@ const addFaculty = async (req, res) => {
             role: 'Faculty',
             leadFaculty: leadFacultyId,
             college: leadFaculty.college,
-            assignedBy: req.user._id
+            assignedBy: req.user._id,
+            profile: {
+                firstName,
+                middleName,
+                lastName,
+                institution: leadFaculty.college?.name || ''
+            }
         });
 
         const emailResult = await sendCredentialsEmail(email, name, password, 'Faculty');
@@ -141,6 +166,11 @@ const addStudent = async (req, res) => {
         }
 
         const password = generatePassword();
+        const nameParts = name ? name.split(' ') : [];
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+        const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
+
         const user = await User.create({
             name,
             email,
@@ -149,7 +179,13 @@ const addStudent = async (req, res) => {
             faculty: facultyWithLeastStudents._id,
             leadFaculty: facultyWithLeastStudents.leadFaculty,
             college: collegeId,
-            assignedBy: req.user._id
+            assignedBy: req.user._id,
+            profile: {
+                firstName,
+                middleName,
+                lastName,
+                institution: college.name || ''
+            }
         });
 
         const emailResult = await sendCredentialsEmail(email, name, password, 'Student');
@@ -174,7 +210,7 @@ const addStudent = async (req, res) => {
 // @route   GET /api/admin/colleges
 const getColleges = async (req, res) => {
     try {
-        const colleges = await College.find().populate('leadFaculty', 'name email');
+        const colleges = await College.find().populate('leadFaculty', 'name email').sort({ name: 1 });
         res.json(colleges);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -237,6 +273,195 @@ const getStudentsByFaculty = async (req, res) => {
     }
 };
 
+// @desc    Delete a College
+// @route   DELETE /api/admin/college/:id
+const deleteCollege = async (req, res) => {
+    try {
+        const college = await College.findById(req.params.id);
+        if (!college) {
+            return res.status(404).json({ message: 'College not found' });
+        }
+
+        // Clear college reference in all users
+        await User.updateMany({ college: req.params.id }, { $set: { college: null } });
+
+        await College.findByIdAndDelete(req.params.id);
+        res.json({ message: 'College deleted and user references cleared' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Delete a User (Lead Faculty, Faculty, or Student)
+// @route   DELETE /api/admin/user/:id
+const deleteUser = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const role = user.role;
+
+        // Cleanup based on role
+        if (role === 'Lead Faculty') {
+            const collegeId = user.college;
+
+            // 1. Find a potential successor (any regular Faculty in the same college)
+            const successor = await User.findOne({
+                college: collegeId,
+                role: 'Faculty',
+                _id: { $ne: user._id }
+            });
+
+            if (successor) {
+                // 2. Promote the successor to Lead Faculty
+                successor.role = 'Lead Faculty';
+                successor.leadFaculty = null;
+                await successor.save();
+
+                // 3. Update the college to point to the new Lead
+                await College.updateMany({ leadFaculty: user._id }, { $set: { leadFaculty: successor._id } });
+
+                // 4. Reassign all other faculties and students to report to the new Lead
+                await User.updateMany(
+                    { college: collegeId, leadFaculty: user._id, _id: { $ne: successor._id } },
+                    { $set: { leadFaculty: successor._id } }
+                );
+
+                // 5. Transfer specific mentorship: Any students directly under the deleted lead
+                // now report to the new promoted lead.
+                await User.updateMany(
+                    { faculty: user._id },
+                    { $set: { faculty: successor._id } }
+                );
+            } else {
+                // No successor found, clear references as before
+                await College.updateMany({ leadFaculty: user._id }, { $set: { leadFaculty: null } });
+                await User.updateMany({ leadFaculty: user._id }, { $set: { leadFaculty: null } });
+            }
+        } else if (role === 'Faculty') {
+            // Clear faculty reference in students
+            await User.updateMany({ faculty: user._id }, { $set: { faculty: null } });
+        }
+
+        await User.findByIdAndDelete(req.params.id);
+        res.json({ message: `${role} deleted and references cleared` });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Update Lead Faculty for a College
+// @route   PUT /api/admin/college/:id/lead
+const updateCollegeLead = async (req, res) => {
+    const { leadFacultyId } = req.body;
+    try {
+        const college = await College.findById(req.params.id);
+        if (!college) {
+            return res.status(404).json({ message: 'College not found' });
+        }
+
+        const newLead = await User.findById(leadFacultyId);
+        if (!newLead) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const oldPrimaryLeadId = college.leadFaculty;
+        const oldPrimaryLead = await User.findById(oldPrimaryLeadId);
+
+        // 1. Promote new lead
+        newLead.role = 'Lead Faculty';
+        newLead.leadFaculty = null;
+        await newLead.save();
+
+        // 2. Update college root reference
+        college.leadFaculty = newLead._id;
+        await college.save();
+
+        // 3. Demote ANYONE ELSE who is currently a Lead Faculty for this college
+        // This ensures the exclusivity (Nelson should only be lead faculty)
+        const otherLeads = await User.find({
+            college: req.params.id,
+            role: 'Lead Faculty',
+            _id: { $ne: newLead._id }
+        });
+
+        for (let lead of otherLeads) {
+            lead.role = 'Faculty';
+            lead.leadFaculty = newLead._id;
+            await lead.save();
+        }
+
+        // 4. Handle Student Transfer (Mapping: New Lead's former students -> Old Primary Lead)
+        // If we have an oldPrimaryLead (e.g. Madhavan), assign Nelson's former students to him.
+        if (oldPrimaryLead && oldPrimaryLead._id.toString() !== newLead._id.toString()) {
+            await User.updateMany(
+                {
+                    college: req.params.id,
+                    role: 'Student',
+                    $or: [{ faculty: newLead._id }, { assignedBy: newLead._id }]
+                },
+                {
+                    $set: {
+                        faculty: oldPrimaryLead._id,
+                        assignedBy: oldPrimaryLead._id,
+                        leadFaculty: newLead._id
+                    }
+                }
+            );
+
+            // Explicitly ensure the old primary lead is reporting to the new lead
+            oldPrimaryLead.role = 'Faculty';
+            oldPrimaryLead.leadFaculty = newLead._id;
+            await oldPrimaryLead.save();
+        }
+
+        // 5. Update all other users (Faculty/Students) in this college to report to the new Lead
+        await User.updateMany(
+            { college: req.params.id, _id: { $ne: newLead._id } },
+            { $set: { leadFaculty: newLead._id } }
+        );
+
+        res.json({
+            message: `Leadership transferred to ${newLead.name}. Previous leads demoted to Faculty.`,
+            college
+        });
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+// @desc    Update Lead Faculty for a specific Faculty member
+// @route   PUT /api/admin/user/:id/lead
+const updateFacultyLead = async (req, res) => {
+    const { leadFacultyId } = req.body;
+    try {
+        const faculty = await User.findById(req.params.id);
+        if (!faculty || faculty.role !== 'Faculty') {
+            return res.status(404).json({ message: 'Faculty not found' });
+        }
+
+        const newLead = await User.findById(leadFacultyId);
+        if (!newLead || newLead.role !== 'Lead Faculty') {
+            return res.status(400).json({ message: 'Invalid Lead Faculty' });
+        }
+
+        // Update faculty and their associated students
+        faculty.leadFaculty = leadFacultyId;
+        await faculty.save();
+
+        await User.updateMany(
+            { faculty: faculty._id },
+            { $set: { leadFaculty: leadFacultyId } }
+        );
+
+        res.json({ message: 'Lead Faculty reassigned for faculty and their students' });
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
 module.exports = {
     addCollege,
     addLeadFaculty,
@@ -245,5 +470,9 @@ module.exports = {
     getColleges,
     getUsers,
     getFacultiesByLeadFaculty,
-    getStudentsByFaculty
+    getStudentsByFaculty,
+    deleteCollege,
+    deleteUser,
+    updateCollegeLead,
+    updateFacultyLead
 };

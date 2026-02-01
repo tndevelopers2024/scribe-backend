@@ -8,7 +8,20 @@ const getProfile = async (req, res) => {
             .select('-password')
             .populate('college', 'name')
             .populate('faculty', 'name email')
-            .populate('leadFaculty', 'name email');
+            .populate('leadFaculty', 'name email')
+            .populate('academicAchievements.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('courseReflections.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('beTheChange.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('researchPublications.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('interdisciplinaryCollaboration.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('conferenceParticipation.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('competitionsAwards.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('workshopsTraining.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('clinicalExperiences.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('voluntaryParticipation.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('ethicsThroughArt.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('thoughtsToActions.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('profile.reviewedBy', 'name profile.firstName profile.lastName');
 
         res.json(user);
     } catch (error) {
@@ -54,7 +67,20 @@ const updateProfile = async (req, res) => {
             .select('-password')
             .populate('college', 'name')
             .populate('faculty', 'name email')
-            .populate('leadFaculty', 'name email');
+            .populate('leadFaculty', 'name email')
+            .populate('academicAchievements.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('courseReflections.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('beTheChange.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('researchPublications.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('interdisciplinaryCollaboration.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('conferenceParticipation.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('competitionsAwards.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('workshopsTraining.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('clinicalExperiences.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('voluntaryParticipation.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('ethicsThroughArt.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('thoughtsToActions.reviewedBy', 'name profile.firstName profile.lastName')
+            .populate('profile.reviewedBy', 'name profile.firstName profile.lastName');
 
         res.json({
             message: 'Profile updated successfully',
@@ -122,6 +148,10 @@ const updateAchievement = async (req, res) => {
         achievement.duration = duration || achievement.duration;
         achievement.currentStatus = currentStatus || achievement.currentStatus;
 
+        if (achievement.status === 'Rejected') {
+            achievement.status = 'Resubmitted';
+        }
+
         await user.save();
 
         res.json({
@@ -149,6 +179,10 @@ const deleteAchievement = async (req, res) => {
 
         if (!achievement) {
             return res.status(404).json({ message: 'Achievement not found' });
+        }
+
+        if (achievement.status === 'Approved') {
+            user.points = Math.max(0, (user.points || 0) - 1);
         }
 
         achievement.deleteOne();
@@ -197,6 +231,10 @@ const updateCourseReflection = async (req, res) => {
         if (whatCanBe) reflection.whatCanBe = whatCanBe;
         if (whatDidILearn) reflection.whatDidILearn = whatDidILearn;
 
+        if (reflection.status === 'Rejected') {
+            reflection.status = 'Resubmitted';
+        }
+
         await user.save();
         res.json({ message: 'Course reflection updated successfully', reflection });
     } catch (error) {
@@ -212,6 +250,10 @@ const deleteCourseReflection = async (req, res) => {
 
         const reflection = user.courseReflections.id(id);
         if (!reflection) return res.status(404).json({ message: 'Reflection not found' });
+
+        if (reflection.status === 'Approved') {
+            user.points = Math.max(0, (user.points || 0) - 1);
+        }
 
         reflection.deleteOne();
         await user.save();
@@ -253,6 +295,10 @@ const updateBeTheChange = async (req, res) => {
         if (year) reflection.year = year;
         if (reflectOnImpact) reflection.reflectOnImpact = reflectOnImpact;
 
+        if (reflection.status === 'Rejected') {
+            reflection.status = 'Resubmitted';
+        }
+
         await user.save();
         res.json({ message: 'Be the Change reflection updated successfully', reflection });
     } catch (error) {
@@ -268,6 +314,10 @@ const deleteBeTheChange = async (req, res) => {
 
         const reflection = user.beTheChange.id(id);
         if (!reflection) return res.status(404).json({ message: 'Reflection not found' });
+
+        if (reflection.status === 'Approved') {
+            user.points = Math.max(0, (user.points || 0) - 1);
+        }
 
         reflection.deleteOne();
         await user.save();
@@ -314,6 +364,10 @@ const updateResearchPublication = async (req, res) => {
         if (citation !== undefined) publication.citation = citation;
         if (impactFactor !== undefined) publication.impactFactor = impactFactor;
 
+        if (publication.status === 'Rejected') {
+            publication.status = 'Resubmitted';
+        }
+
         await user.save();
         res.json({ message: 'Research publication updated successfully', publication });
     } catch (error) {
@@ -329,6 +383,10 @@ const deleteResearchPublication = async (req, res) => {
 
         const publication = user.researchPublications.id(id);
         if (!publication) return res.status(404).json({ message: 'Publication not found' });
+
+        if (publication.status === 'Approved') {
+            user.points = Math.max(0, (user.points || 0) - 1);
+        }
 
         publication.deleteOne();
         await user.save();
@@ -376,6 +434,10 @@ const updateInterdisciplinaryCollaboration = async (req, res) => {
         if (whatWentWell) collaboration.whatWentWell = whatWentWell;
         if (whatCanBeImproved) collaboration.whatCanBeImproved = whatCanBeImproved;
 
+        if (collaboration.status === 'Rejected') {
+            collaboration.status = 'Resubmitted';
+        }
+
         await user.save();
         res.json({ message: 'Collaboration updated successfully', collaboration });
     } catch (error) {
@@ -391,6 +453,10 @@ const deleteInterdisciplinaryCollaboration = async (req, res) => {
 
         const collaboration = user.interdisciplinaryCollaboration.id(id);
         if (!collaboration) return res.status(404).json({ message: 'Collaboration not found' });
+
+        if (collaboration.status === 'Approved') {
+            user.points = Math.max(0, (user.points || 0) - 1);
+        }
 
         collaboration.deleteOne();
         await user.save();
@@ -437,6 +503,10 @@ const updateConferenceParticipation = async (req, res) => {
         if (nationalInternational) conference.nationalInternational = nationalInternational;
         if (mode) conference.mode = mode;
 
+        if (conference.status === 'Rejected') {
+            conference.status = 'Resubmitted';
+        }
+
         await user.save();
         res.json({ message: 'Conference participation updated successfully', conference });
     } catch (error) {
@@ -452,6 +522,10 @@ const deleteConferenceParticipation = async (req, res) => {
 
         const conference = user.conferenceParticipation.id(id);
         if (!conference) return res.status(404).json({ message: 'Conference not found' });
+
+        if (conference.status === 'Approved') {
+            user.points = Math.max(0, (user.points || 0) - 1);
+        }
 
         conference.deleteOne();
         await user.save();
@@ -497,6 +571,10 @@ const updateCompetitionAward = async (req, res) => {
         if (summaryOfWork) comp.summaryOfWork = summaryOfWork;
         if (awardsReceived) comp.awardsReceived = awardsReceived;
 
+        if (comp.status === 'Rejected') {
+            comp.status = 'Resubmitted';
+        }
+
         await user.save();
         res.json({ message: 'Competition/Award updated successfully', competition: comp });
     } catch (error) {
@@ -512,6 +590,10 @@ const deleteCompetitionAward = async (req, res) => {
 
         const comp = user.competitionsAwards.id(id);
         if (!comp) return res.status(404).json({ message: 'Competition not found' });
+
+        if (comp.status === 'Approved') {
+            user.points = Math.max(0, (user.points || 0) - 1);
+        }
 
         comp.deleteOne();
         await user.save();
@@ -555,6 +637,10 @@ const updateWorkshopTraining = async (req, res) => {
         if (mode) workshop.mode = mode;
         if (skillsAcquired) workshop.skillsAcquired = skillsAcquired;
 
+        if (workshop.status === 'Rejected') {
+            workshop.status = 'Resubmitted';
+        }
+
         await user.save();
         res.json({ message: 'Workshop/Training updated successfully', workshop });
     } catch (error) {
@@ -570,6 +656,10 @@ const deleteWorkshopTraining = async (req, res) => {
 
         const workshop = user.workshopsTraining.id(id);
         if (!workshop) return res.status(404).json({ message: 'Workshop not found' });
+
+        if (workshop.status === 'Approved') {
+            user.points = Math.max(0, (user.points || 0) - 1);
+        }
 
         workshop.deleteOne();
         await user.save();
@@ -614,6 +704,10 @@ const updateClinicalExperience = async (req, res) => {
         if (yourPerspective) experience.yourPerspective = yourPerspective;
         if (howToManage) experience.howToManage = howToManage;
 
+        if (experience.status === 'Rejected') {
+            experience.status = 'Resubmitted';
+        }
+
         await user.save();
         res.json({ message: 'Clinical experience updated successfully', experience });
     } catch (error) {
@@ -629,6 +723,10 @@ const deleteClinicalExperience = async (req, res) => {
 
         const experience = user.clinicalExperiences.id(id);
         if (!experience) return res.status(404).json({ message: 'Clinical experience not found' });
+
+        if (experience.status === 'Approved') {
+            user.points = Math.max(0, (user.points || 0) - 1);
+        }
 
         experience.deleteOne();
         await user.save();
@@ -672,6 +770,10 @@ const updateVoluntaryParticipation = async (req, res) => {
         if (whatDidYouLearn) participation.whatDidYouLearn = whatDidYouLearn;
         if (positiveInfluence) participation.positiveInfluence = positiveInfluence;
 
+        if (participation.status === 'Rejected') {
+            participation.status = 'Resubmitted';
+        }
+
         await user.save();
         res.json({ message: 'Voluntary participation updated successfully', participation });
     } catch (error) {
@@ -687,6 +789,10 @@ const deleteVoluntaryParticipation = async (req, res) => {
 
         const participation = user.voluntaryParticipation.id(id);
         if (!participation) return res.status(404).json({ message: 'Voluntary participation not found' });
+
+        if (participation.status === 'Approved') {
+            user.points = Math.max(0, (user.points || 0) - 1);
+        }
 
         participation.deleteOne();
         await user.save();
@@ -730,6 +836,10 @@ const updateEthicsThroughArt = async (req, res) => {
         if (howExpressed) art.howExpressed = howExpressed;
         if (whyThisFormat) art.whyThisFormat = whyThisFormat;
 
+        if (art.status === 'Rejected') {
+            art.status = 'Pending';
+        }
+
         await user.save();
         res.json({ message: 'Ethics through art updated successfully', art });
     } catch (error) {
@@ -745,6 +855,10 @@ const deleteEthicsThroughArt = async (req, res) => {
 
         const art = user.ethicsThroughArt.id(id);
         if (!art) return res.status(404).json({ message: 'Ethics through art not found' });
+
+        if (art.status === 'Approved') {
+            user.points = Math.max(0, (user.points || 0) - 1);
+        }
 
         art.deleteOne();
         await user.save();
@@ -785,6 +899,10 @@ const updateThinkingToAction = async (req, res) => {
 
         if (futurePlan) plan.futurePlan = futurePlan;
 
+        if (plan.status === 'Rejected') {
+            plan.status = 'Pending';
+        }
+
         await user.save();
         res.json({ message: 'Future plan updated successfully', plan });
     } catch (error) {
@@ -800,6 +918,10 @@ const deleteThinkingToAction = async (req, res) => {
 
         const plan = user.thoughtsToActions.id(id);
         if (!plan) return res.status(404).json({ message: 'Plan not found' });
+
+        if (plan.status === 'Approved') {
+            user.points = Math.max(0, (user.points || 0) - 1);
+        }
 
         plan.deleteOne();
         await user.save();

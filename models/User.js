@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const userSchema = new mongoose.Schema({
     name: {
@@ -60,8 +61,10 @@ const userSchema = new mongoose.Schema({
         about: { type: String },
         vision: { type: String },
         profilePicture: { type: String },
-        status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
-        feedback: { type: String }
+        status: { type: String, enum: ['Pending', 'Approved', 'Rejected', 'Resubmitted'], default: 'Pending' },
+        feedback: { type: String },
+        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reviewedAt: { type: Date }
     },
     academicAchievements: [{
         courseName: { type: String, required: true },
@@ -77,8 +80,10 @@ const userSchema = new mongoose.Schema({
             enum: ['Completed', 'In Progress', 'Planned', ''],
             required: true
         },
-        status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
+        status: { type: String, enum: ['Pending', 'Approved', 'Rejected', 'Resubmitted'], default: 'Pending' },
         feedback: { type: String },
+        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reviewedAt: { type: Date },
         createdAt: { type: Date, default: Date.now }
     }],
     courseReflections: [{
@@ -89,15 +94,19 @@ const userSchema = new mongoose.Schema({
         whatWasGood: { type: String, required: true },
         whatCanBe: { type: String, required: true },
         whatDidILearn: { type: String, required: true },
-        status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
+        status: { type: String, enum: ['Pending', 'Approved', 'Rejected', 'Resubmitted'], default: 'Pending' },
         feedback: { type: String },
+        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reviewedAt: { type: Date },
         createdAt: { type: Date, default: Date.now }
     }],
     beTheChange: [{
         year: { type: String, required: true },
         reflectOnImpact: { type: String, required: true },
-        status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
+        status: { type: String, enum: ['Pending', 'Approved', 'Rejected', 'Resubmitted'], default: 'Pending' },
         feedback: { type: String },
+        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reviewedAt: { type: Date },
         createdAt: { type: Date, default: Date.now }
     }],
     researchPublications: [{
@@ -108,8 +117,10 @@ const userSchema = new mongoose.Schema({
         doi: { type: String },
         citation: { type: String },
         impactFactor: { type: String },
-        status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
+        status: { type: String, enum: ['Pending', 'Approved', 'Rejected', 'Resubmitted'], default: 'Pending' },
         feedback: { type: String },
+        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reviewedAt: { type: Date },
         createdAt: { type: Date, default: Date.now }
     }],
     interdisciplinaryCollaboration: [{
@@ -121,8 +132,10 @@ const userSchema = new mongoose.Schema({
         teamExperience: { type: String, required: true },
         whatWentWell: { type: String, required: true },
         whatCanBeImproved: { type: String, required: true },
-        status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
+        status: { type: String, enum: ['Pending', 'Approved', 'Rejected', 'Resubmitted'], default: 'Pending' },
         feedback: { type: String },
+        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reviewedAt: { type: Date },
         createdAt: { type: Date, default: Date.now }
     }],
     conferenceParticipation: [{
@@ -133,8 +146,10 @@ const userSchema = new mongoose.Schema({
         venue: { type: String, required: true },
         nationalInternational: { type: String, required: true },
         mode: { type: String, required: true },
-        status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
+        status: { type: String, enum: ['Pending', 'Approved', 'Rejected', 'Resubmitted'], default: 'Pending' },
         feedback: { type: String },
+        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reviewedAt: { type: Date },
         createdAt: { type: Date, default: Date.now }
     }],
     competitionsAwards: [{
@@ -144,8 +159,10 @@ const userSchema = new mongoose.Schema({
         mode: { type: String, required: true },
         summaryOfWork: { type: String, required: true },
         awardsReceived: { type: String, required: true },
-        status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
+        status: { type: String, enum: ['Pending', 'Approved', 'Rejected', 'Resubmitted'], default: 'Pending' },
         feedback: { type: String },
+        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reviewedAt: { type: Date },
         createdAt: { type: Date, default: Date.now }
     }],
     workshopsTraining: [{
@@ -153,8 +170,10 @@ const userSchema = new mongoose.Schema({
         conductedBy: { type: String, required: true },
         mode: { type: String, required: true },
         skillsAcquired: { type: String, required: true },
-        status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
+        status: { type: String, enum: ['Pending', 'Approved', 'Rejected', 'Resubmitted'], default: 'Pending' },
         feedback: { type: String },
+        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reviewedAt: { type: Date },
         createdAt: { type: Date, default: Date.now }
     }],
     clinicalExperiences: [{
@@ -163,8 +182,10 @@ const userSchema = new mongoose.Schema({
         whatWasDone: { type: String, required: true },
         yourPerspective: { type: String, required: true },
         howToManage: { type: String, required: true },
-        status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
+        status: { type: String, enum: ['Pending', 'Approved', 'Rejected', 'Resubmitted'], default: 'Pending' },
         feedback: { type: String },
+        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reviewedAt: { type: Date },
         createdAt: { type: Date, default: Date.now }
     }],
     voluntaryParticipation: [{
@@ -172,8 +193,10 @@ const userSchema = new mongoose.Schema({
         yourRole: { type: String, required: true },
         whatDidYouLearn: { type: String, required: true },
         positiveInfluence: { type: String, required: true },
-        status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
+        status: { type: String, enum: ['Pending', 'Approved', 'Rejected', 'Resubmitted'], default: 'Pending' },
         feedback: { type: String },
+        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reviewedAt: { type: Date },
         createdAt: { type: Date, default: Date.now }
     }],
     ethicsThroughArt: [{
@@ -181,8 +204,10 @@ const userSchema = new mongoose.Schema({
         whyThisTopic: { type: String, required: true },
         howExpressed: { type: String, required: true },
         whyThisFormat: { type: String, required: true },
-        status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
+        status: { type: String, enum: ['Pending', 'Approved', 'Rejected', 'Resubmitted'], default: 'Pending' },
         feedback: { type: String },
+        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reviewedAt: { type: Date },
         createdAt: { type: Date, default: Date.now }
     }],
     thoughtsToActions: [{
@@ -190,6 +215,8 @@ const userSchema = new mongoose.Schema({
         targetDate: { type: Date },
         status: { type: String, enum: ['Pending', 'In Progress', 'Achieved', 'Approved', 'Rejected'], default: 'Pending' },
         feedback: { type: String },
+        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reviewedAt: { type: Date },
         createdAt: { type: Date, default: Date.now }
     }],
     isFirstLogin: {
@@ -204,6 +231,8 @@ const userSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    resetPasswordOtp: String,
+    resetPasswordOtpExpire: Date,
     createdAt: {
         type: Date,
         default: Date.now
@@ -222,6 +251,23 @@ userSchema.pre('save', async function () {
 // Match user entered password to hashed password in database
 userSchema.methods.matchPassword = async function (enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// Generate and hash password OTP
+userSchema.methods.getResetPasswordOtp = function () {
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Hash token and set to resetPasswordOtp field
+    this.resetPasswordOtp = crypto
+        .createHash('sha256')
+        .update(otp)
+        .digest('hex');
+
+    // Set expire (10 minutes)
+    this.resetPasswordOtpExpire = Date.now() + 10 * 60 * 1000;
+
+    return otp;
 };
 
 module.exports = mongoose.model('User', userSchema);

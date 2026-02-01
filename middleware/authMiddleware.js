@@ -8,16 +8,25 @@ const protect = async (req, res, next) => {
         try {
             token = req.headers.authorization.split(' ')[1];
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            req.user = await User.findById(decoded.id).select('-password');
-            next();
+            const user = await User.findById(decoded.id).select('-password');
+
+            if (!user) {
+                console.warn(`[AUTH FAIL] User not found for ID: ${decoded.id}`);
+                return res.status(401).json({ message: 'User no longer exists' });
+            }
+
+            req.user = user;
+            console.log(`[AUTH SUCCESS] User: ${user.email}, Role: ${user.role}, Path: ${req.path}`);
+            return next();
         } catch (error) {
-            console.error(error);
-            res.status(401).json({ message: 'Not authorized, token failed' });
+            console.error(`[AUTH ERROR] ${error.message} - Path: ${req.path}`);
+            return res.status(401).json({ message: 'Not authorized, token failed' });
         }
     }
 
     if (!token) {
-        res.status(401).json({ message: 'Not authorized, no token' });
+        console.warn(`[AUTH FAIL] No token provided - Path: ${req.path}`);
+        return res.status(401).json({ message: 'Not authorized, no token' });
     }
 };
 
