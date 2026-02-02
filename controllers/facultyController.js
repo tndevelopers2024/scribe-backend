@@ -34,7 +34,7 @@ const getAssignedStudents = async (req, res) => {
             console.log(`[DEBUG] Lead Faculty ${req.user.email} querying. College: ${userCollegeId}, Subordinates: ${subordinateIds.length}`);
         } else if (req.user.role === 'Faculty') {
             query.faculty = req.user._id;
-        } else if (req.user.role === 'Super Admin') {
+        } else if (req.user.role === 'Super Admin' || req.user.role === 'Admin') {
             // Keep query as is (role: 'Student') to see all
         } else {
             return res.status(403).json({ message: 'Forbidden' });
@@ -90,9 +90,9 @@ const getStudentPortfolio = async (req, res) => {
 
         const isDirectFaculty = studentFacultyId === userId;
         const isLeadFacultyDirect = studentLeadFacultyId === userId;
-        const isInSameCollege = (req.user.role === 'Lead Faculty' || req.user.role === 'Super Admin') &&
+        const isInSameCollege = (req.user.role === 'Lead Faculty' || req.user.role === 'Super Admin' || req.user.role === 'Admin') &&
             studentCollegeId && userCollegeId && studentCollegeId === userCollegeId;
-        const isSuperAdmin = req.user.role === 'Super Admin';
+        const isSuperAdmin = req.user.role === 'Super Admin' || req.user.role === 'Admin';
 
         if (!isDirectFaculty && !isInSameCollege && !isLeadFacultyDirect && !isSuperAdmin) {
             console.warn(`[AUTH FAIL] User ${req.user.email} (${req.user.role}) attempted to view student ${student.name}. 
@@ -146,9 +146,9 @@ const reviewPortfolioItem = async (req, res) => {
 
         const isDirectFaculty = studentFacultyId === userId;
         const isLeadFacultyDirect = studentLeadFacultyId === userId;
-        const isInSameCollege = (req.user.role === 'Lead Faculty' || req.user.role === 'Super Admin') &&
+        const isInSameCollege = (req.user.role === 'Lead Faculty' || req.user.role === 'Super Admin' || req.user.role === 'Admin') &&
             studentCollegeId && userCollegeId && studentCollegeId === userCollegeId;
-        const isSuperAdmin = req.user.role === 'Super Admin';
+        const isSuperAdmin = req.user.role === 'Super Admin' || req.user.role === 'Admin';
 
         if (!isDirectFaculty && !isInSameCollege && !isLeadFacultyDirect && !isSuperAdmin) {
             return res.status(403).json({ message: 'Not authorized to review this student' });

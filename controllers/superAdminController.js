@@ -206,6 +206,36 @@ const addStudent = async (req, res) => {
     }
 };
 
+// @desc    Add Admin (Read-only Super Admin)
+// @route   POST /api/admin/admin
+const addAdmin = async (req, res) => {
+    const { name, email } = req.body;
+    try {
+        const userExists = await User.findOne({ email });
+        if (userExists) {
+            return res.status(400).json({ message: 'User with this email already exists' });
+        }
+
+        const password = generatePassword();
+        const user = await User.create({
+            name,
+            email,
+            password,
+            role: 'Admin',
+            assignedBy: req.user._id
+        });
+
+        const emailResult = await sendCredentialsEmail(email, name, password, 'Admin');
+        res.status(201).json({
+            message: emailResult.success ? 'Admin added and email sent successfully' : `Admin added but email failed: ${emailResult.error}`,
+            user,
+            emailSent: emailResult.success
+        });
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
 // @desc    Get All Colleges
 // @route   GET /api/admin/colleges
 const getColleges = async (req, res) => {
@@ -467,6 +497,7 @@ module.exports = {
     addLeadFaculty,
     addFaculty,
     addStudent,
+    addAdmin,
     getColleges,
     getUsers,
     getFacultiesByLeadFaculty,
