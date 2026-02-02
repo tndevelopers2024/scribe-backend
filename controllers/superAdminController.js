@@ -266,7 +266,7 @@ const getStudentsByFaculty = async (req, res) => {
         })
             .populate('faculty', 'name email')
             .populate('college', 'name')
-            .select('name email role faculty college');
+            .select('name email role faculty college profile academicAchievements courseReflections beTheChange researchPublications interdisciplinaryCollaboration conferenceParticipation competitionsAwards workshopsTraining clinicalExperiences voluntaryParticipation ethicsThroughArt thoughtsToActions');
         res.json(students);
     } catch (error) {
         res.status(500).json({ message: error.message });
