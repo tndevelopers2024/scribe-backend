@@ -2,6 +2,8 @@ const User = require('../models/User');
 const College = require('../models/College');
 const { sendCredentialsEmail } = require('../utils/emailService');
 const crypto = require('crypto');
+const csv = require('csv-parser');
+const { Readable } = require('stream');
 
 const generatePassword = () => {
     return crypto.randomBytes(4).toString('hex'); // 8 chars
@@ -492,6 +494,156 @@ const updateFacultyLead = async (req, res) => {
     }
 };
 
+// Exports moved to end of file
+
+// @desc    Preview Bulk Student Upload (Distribution Dry Run)
+// @route   POST /api/admin/preview-students
+const previewBulkStudents = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const { collegeId } = req.body;
+        if (!collegeId) {
+            return res.status(400).json({ message: 'College ID is required' });
+        }
+
+        const college = await College.findById(collegeId);
+        if (!college) {
+            return res.status(404).json({ message: 'College not found' });
+        }
+
+        // 1. Fetch all faculties in the college
+        const faculties = await User.find({ role: 'Faculty', college: collegeId });
+        if (faculties.length === 0) {
+            return res.status(400).json({ message: 'No faculties available in this college to assign students to.' });
+        }
+
+        // 2. Get current student counts for each faculty to initialize the heap
+        // We use a simple array of objects { faculty, count } and sort it.
+        const facultyCounts = await Promise.all(faculties.map(async (faculty) => {
+            const count = await User.countDocuments({ role: 'Student', faculty: faculty._id });
+            return {
+                id: faculty._id,
+                name: faculty.name,
+                email: faculty.email,
+                leadFaculty: faculty.leadFaculty,
+                count: count
+            };
+        }));
+
+        // 3. Parse CSV
+        const results = [];
+        const stream = Readable.from(req.file.buffer.toString());
+
+        stream
+            .pipe(csv())
+            .on('data', (data) => results.push(data))
+            .on('end', () => {
+                // 4. Distribute Students
+                const distributedStudents = results.map((studentRow) => {
+                    // Sort faculties by current student count (ascending)
+                    facultyCounts.sort((a, b) => a.count - b.count);
+
+                    // Pick the one with the least students
+                    const selectedFaculty = facultyCounts[0];
+
+                    // Increment the count for next iteration simulation
+                    selectedFaculty.count++;
+
+                    return {
+                        name: studentRow.name || studentRow.Name,
+                        email: studentRow.email || studentRow.Email,
+                        collegeId: collegeId,
+                        assignedFacultyId: selectedFaculty.id,
+                        assignedFacultyName: selectedFaculty.name,
+                        assignedFacultyEmail: selectedFaculty.email,
+                        leadFaculty: selectedFaculty.leadFaculty
+                    };
+                });
+
+                res.json({
+                    message: 'Preview generated successfully',
+                    students: distributedStudents
+                });
+            });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Confirm Bulk Student Upload
+// @route   POST /api/admin/confirm-students
+const confirmBulkStudents = async (req, res) => {
+    const { students } = req.body; // Expects array of students with assignedFacultyId from preview
+    if (!students || !Array.isArray(students) || students.length === 0) {
+        return res.status(400).json({ message: 'No students provided for confirmation' });
+    }
+
+    let successCount = 0;
+    let errors = [];
+
+    try {
+        // Iterate and create users
+        for (const studentData of students) {
+            try {
+                // Check if user exists
+                const userExists = await User.findOne({ email: studentData.email });
+                if (userExists) {
+                    errors.push(`User ${studentData.email} already exists`);
+                    continue;
+                }
+
+                const password = generatePassword();
+                const nameParts = studentData.name ? studentData.name.split(' ') : [];
+                const firstName = nameParts[0] || '';
+                const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+                const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
+
+                // Get college name for profile
+                const college = await College.findById(studentData.collegeId);
+
+                await User.create({
+                    name: studentData.name,
+                    email: studentData.email,
+                    password,
+                    role: 'Student',
+                    faculty: studentData.assignedFacultyId,
+                    leadFaculty: studentData.leadFaculty,
+                    college: studentData.collegeId,
+                    assignedBy: req.user._id,
+                    profile: {
+                        firstName,
+                        middleName,
+                        lastName,
+                        institution: college ? college.name : ''
+                    }
+                });
+
+                // Send email
+                await sendCredentialsEmail(studentData.email, studentData.name, password, 'Student');
+                successCount++;
+
+            } catch (err) {
+                console.error(`Error creating student ${studentData.email}:`, err);
+                errors.push(`Failed to create ${studentData.email}: ${err.message}`);
+            }
+        }
+
+        res.status(201).json({
+            message: `Process completed. ${successCount} students added successfully.`,
+            successCount,
+            errors
+        });
+
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     addCollege,
     addLeadFaculty,
@@ -505,5 +657,7 @@ module.exports = {
     deleteCollege,
     deleteUser,
     updateCollegeLead,
-    updateFacultyLead
+    updateFacultyLead,
+    previewBulkStudents,
+    confirmBulkStudents
 };

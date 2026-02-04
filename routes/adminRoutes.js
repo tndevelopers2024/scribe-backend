@@ -12,9 +12,14 @@ const {
     deleteCollege,
     deleteUser,
     updateCollegeLead,
-    updateFacultyLead
+    updateFacultyLead,
+    previewBulkStudents,
+    confirmBulkStudents
 } = require('../controllers/superAdminController');
 const { protect, authorize } = require('../middleware/authMiddleware');
+const multer = require('multer');
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 const router = express.Router();
 
@@ -27,6 +32,8 @@ router.post('/lead-faculty', authorize('Super Admin'), addLeadFaculty);
 router.post('/faculty', authorize('Super Admin'), addFaculty);
 router.post('/student', authorize('Super Admin'), addStudent);
 router.post('/admin', authorize('Super Admin'), addAdmin);
+router.post('/preview-students', authorize('Super Admin'), upload.single('file'), previewBulkStudents);
+router.post('/confirm-students', authorize('Super Admin'), confirmBulkStudents);
 router.get('/colleges', getColleges);
 router.get('/users', authorize('Super Admin', 'Admin'), getUsers);
 

@@ -10,9 +10,9 @@ const testEmail = async () => {
     console.log(`Pass: ${maskedPass} (Length: ${pass.length})`);
 
     const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
+        host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+        port: process.env.EMAIL_PORT || 465,
+        secure: process.env.EMAIL_SECURE === 'true',
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS
@@ -27,9 +27,9 @@ const testEmail = async () => {
         console.log('Attempting to send mail...');
         const info = await transporter.sendMail({
             from: process.env.EMAIL_USER,
-            to: process.env.EMAIL_USER, // Send to self
-            subject: 'Test Email from CMS',
-            text: 'If you see this, the email service is working!'
+            to: 'madhavangl20@gmail.com', // Updated recipient
+            subject: 'Test Email from CMS - Custom Domain',
+            text: 'If you see this, the custom domain email service is working correctly!'
         });
         console.log(`✅ Email sent: ${info.messageId}`);
     } catch (error) {
