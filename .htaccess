@@ -1,0 +1,9 @@
+# CORS handling is now managed by the Express application in server.js
+# to avoid conflicts and allow for dynamic origin validation.
+
+# Unset the header if it was added by CyberPanel/LiteSpeed to prevent duplicates
+<IfModule mod_headers.c>
+    Header unset Access-Control-Allow-Origin
+    Header always unset Access-Control-Allow-Origin
+</IfModule>
+

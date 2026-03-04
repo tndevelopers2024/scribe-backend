@@ -27,21 +27,21 @@ const router = express.Router();
 router.use(protect);
 
 // Super Admin only routes
-router.post('/college', authorize('Super Admin'), addCollege);
-router.post('/lead-faculty', authorize('Super Admin'), addLeadFaculty);
-router.post('/faculty', authorize('Super Admin'), addFaculty);
-router.post('/student', authorize('Super Admin'), addStudent);
-router.post('/admin', authorize('Super Admin'), addAdmin);
-router.post('/preview-students', authorize('Super Admin'), upload.single('file'), previewBulkStudents);
-router.post('/confirm-students', authorize('Super Admin'), confirmBulkStudents);
+router.post('/college', authorize('Super Admin', 'Developer'), addCollege);
+router.post('/lead-faculty', authorize('Super Admin', 'Developer'), addLeadFaculty);
+router.post('/faculty', authorize('Super Admin', 'Developer'), addFaculty);
+router.post('/student', authorize('Super Admin', 'Developer'), addStudent);
+router.post('/admin', authorize('Super Admin', 'Developer'), addAdmin);
+router.post('/preview-students', authorize('Super Admin', 'Developer'), upload.single('file'), previewBulkStudents);
+router.post('/confirm-students', authorize('Super Admin', 'Developer'), confirmBulkStudents);
 router.get('/colleges', getColleges);
-router.get('/users', authorize('Super Admin', 'Admin'), getUsers);
+router.get('/users', authorize('Super Admin', 'Admin', 'Developer'), getUsers);
 
 // Management routes
-router.delete('/college/:id', authorize('Super Admin'), deleteCollege);
-router.delete('/user/:id', authorize('Super Admin'), deleteUser);
-router.put('/college/:id/lead', authorize('Super Admin'), updateCollegeLead);
-router.put('/user/:id/lead', authorize('Super Admin'), updateFacultyLead);
+router.delete('/college/:id', authorize('Super Admin', 'Developer'), deleteCollege);
+router.delete('/user/:id', authorize('Super Admin', 'Developer'), deleteUser);
+router.put('/college/:id/lead', authorize('Super Admin', 'Developer'), updateCollegeLead);
+router.put('/user/:id/lead', authorize('Super Admin', 'Developer'), updateFacultyLead);
 
 // Lead Faculty can access their own faculties and students
 router.get('/faculties/:leadFacultyId', authorize('Super Admin', 'Lead Faculty', 'Admin'), getFacultiesByLeadFaculty);

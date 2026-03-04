@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const DriscollReflection = require('../models/DriscollReflection');
 
 // @desc    Get all students assigned to a faculty
 // @route   GET /api/faculty/students
@@ -115,10 +116,19 @@ const getStudentPortfolio = async (req, res) => {
             clinical: student.clinicalExperiences?.filter(item => ['Pending', 'Resubmitted'].includes(item.status)).length || 0,
             voluntary: student.voluntaryParticipation?.filter(item => ['Pending', 'Resubmitted'].includes(item.status)).length || 0,
             ethics: student.ethicsThroughArt?.filter(item => ['Pending', 'Resubmitted'].includes(item.status)).length || 0,
-            thoughts: student.thoughtsToActions?.filter(item => ['Pending', 'Resubmitted'].includes(item.status)).length || 0
+            thoughts: student.thoughtsToActions?.filter(item => ['Pending', 'In Progress', 'Achieved', 'Approved', 'Rejected'].includes(item.status)).length || 0,
+            driscollReflections: 0 // Will be updated below
         };
 
-        res.json({ ...student.toObject(), pendingCounts });
+        // Fetch Driscoll Reflections separately as they are in a different collection
+        const driscollReflections = await DriscollReflection.find({ user: student._id })
+            .populate('seminar', 'title date')
+            .populate('reviewedBy', 'name profile.firstName profile.lastName')
+            .sort({ createdAt: -1 });
+
+        pendingCounts.driscollReflections = driscollReflections.filter(item => ['Pending', 'Resubmitted'].includes(item.status)).length;
+
+        res.json({ ...student.toObject(), pendingCounts, driscollReflections });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

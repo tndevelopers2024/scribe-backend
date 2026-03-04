@@ -4,13 +4,16 @@ const nodemailer = require('nodemailer');
 // Create reusable transporter
 const createTransporter = () => {
     return nodemailer.createTransport({
+        pool: true,
         host: process.env.EMAIL_HOST || 'smtp.gmail.com',
         port: process.env.EMAIL_PORT || 465,
         secure: process.env.EMAIL_SECURE === 'true',
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS
-        }
+        },
+        maxConnections: 5,
+        maxMessages: 100
     });
 };
 
