@@ -22,24 +22,24 @@ const addDriscollReflection = async (req, res) => {
         const now = new Date();
         const seminarDate = new Date(seminar.date);
 
-        // Window start: 00:00 of the day after seminar
+        // Window start: 6:00 PM on the seminar date
         const startTime = new Date(seminarDate);
-        startTime.setDate(startTime.getDate() + 1);
-        startTime.setHours(0, 0, 0, 0);
+        startTime.setHours(18, 0, 0, 0);
 
-        // Window end: 24 hours after start
-        const endTime = new Date(startTime);
+        // Window end: 10:00 PM on the next day
+        const endTime = new Date(seminarDate);
         endTime.setDate(endTime.getDate() + 1);
+        endTime.setHours(22, 0, 0, 0);
 
         if (now < startTime) {
             return res.status(403).json({
-                message: 'Reflection window has not started yet. It starts the day after the seminar.'
+                message: 'Reflection window has not started yet. It starts at 6:00 PM on the seminar date.'
             });
         }
 
         if (now > endTime) {
             return res.status(403).json({
-                message: 'Reflection window is closed. You can only reflect within 24 hours of the window starting.'
+                message: 'Reflection window is closed. It closes at 10:00 PM the following day of the seminar.'
             });
         }
 
