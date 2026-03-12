@@ -237,6 +237,16 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     }
+}, {
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+});
+
+// Virtual for Driscoll Reflections
+userSchema.virtual('driscollReflections', {
+    ref: 'DriscollReflection',
+    localField: '_id',
+    foreignField: 'user'
 });
 
 // Encrypt password before saving

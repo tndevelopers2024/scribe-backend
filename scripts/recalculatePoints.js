@@ -2,6 +2,7 @@ const path = require('path');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const User = require('../models/User');
+require('../models/DriscollReflection');
 
 // Load env vars
 dotenv.config({ path: path.join(__dirname, '../.env') });
@@ -20,14 +21,15 @@ const recalculatePoints = async () => {
     await connectDB();
 
     try {
-        const students = await User.find({ role: 'Student' });
+        const students = await User.find({ role: 'Student' })
+            .populate('driscollReflections');
         console.log(`Found ${students.length} students. Recalculating points...`);
 
         for (const student of students) {
             let totalPoints = 0;
 
             // Check Profile
-            if (student.profile && student.profile.status === 'Approved') {
+            if (student.profile && student.profile.status?.toLowerCase() === 'approved') {
                 totalPoints++;
             }
 
@@ -44,12 +46,14 @@ const recalculatePoints = async () => {
                 'clinicalExperiences',
                 'voluntaryParticipation',
                 'ethicsThroughArt',
-                'thoughtsToActions'
+                'thoughtsToActions',
+                'driscollReflections'
             ];
 
             sections.forEach(section => {
-                if (student[section] && Array.isArray(student[section])) {
-                    const approvedItems = student[section].filter(item => item.status === 'Approved');
+                const items = student[section];
+                if (items && Array.isArray(items)) {
+                    const approvedItems = items.filter(item => item.status?.toLowerCase() === 'approved');
                     totalPoints += approvedItems.length;
                 }
             });
