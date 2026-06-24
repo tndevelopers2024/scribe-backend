@@ -22,22 +22,29 @@ const addDriscollReflection = async (req, res) => {
         const now = new Date();
         const seminarDate = new Date(seminar.date);
 
-        // Window start: 6:00 PM IST (12:30 PM UTC) on the seminar date
+        // Window start: 12:00 AM UTC on the seminar date
         const startTime = new Date(seminarDate);
-        startTime.setUTCHours(12, 30, 0, 0);
+        startTime.setUTCHours(0, 0, 0, 0);
 
-        // Window end: 10:00 PM IST (4:30 PM UTC) on the next day
-        const endTime = new Date(seminarDate);
-        endTime.setUTCDate(endTime.getUTCDate() + 1);
-        endTime.setUTCHours(16, 30, 0, 0);
+        // Window end: 10:00 PM IST (4:30 PM UTC) on the next day after seminar or creation
+        const seminarEndTime = new Date(seminarDate);
+        seminarEndTime.setUTCDate(seminarEndTime.getUTCDate() + 1);
+        seminarEndTime.setUTCHours(16, 30, 0, 0);
+
+        const createdDate = new Date(seminar.createdAt || seminar.date);
+        let hasNoTimer = false;
+        // If created after the normal window ended, keep it open indefinitely
+        if (createdDate > seminarEndTime) {
+            hasNoTimer = true;
+        }
 
         if (now < startTime) {
             return res.status(403).json({
-                message: 'Reflection window has not started yet. It starts at 6:00 PM on the seminar date.'
+                message: 'Reflection window has not started yet. It starts at 12:00 AM UTC on the seminar date.'
             });
         }
 
-        if (now > endTime) {
+        if (!hasNoTimer && now > seminarEndTime) {
             return res.status(403).json({
                 message: 'Reflection window is closed. It closes at 10:00 PM the following day of the seminar.'
             });
