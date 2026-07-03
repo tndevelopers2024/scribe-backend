@@ -31,44 +31,63 @@ const addCollege = async (req, res) => {
 const addLeadFaculty = async (req, res) => {
     const { name, email, collegeId } = req.body;
     try {
-        const userExists = await User.findOne({ email });
-        if (userExists) {
-            return res.status(400).json({ message: 'User with this email already exists' });
+        let user = await User.findOne({ email });
+        let emailResult = { success: true };
+        let isNewUser = false;
+
+        const college = await College.findById(collegeId);
+        if (!college) {
+            return res.status(400).json({ message: 'Invalid College ID' });
         }
 
-        const password = generatePassword();
-        const nameParts = name ? name.split(' ') : [];
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
-        const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
-
-        // Get college name for institution initialization
-        const college = await College.findById(collegeId);
-
-        const user = await User.create({
-            name,
-            email,
-            password,
-            role: 'Lead Faculty',
-            college: collegeId,
-            assignedBy: req.user._id,
-            profile: {
-                firstName,
-                middleName,
-                lastName,
-                institution: college ? college.name : ''
+        if (user) {
+            if (user.role !== 'Lead Faculty') {
+                return res.status(400).json({ message: 'User exists but is not a Lead Faculty' });
             }
-        });
+            if (user.colleges && user.colleges.includes(collegeId)) {
+                return res.status(400).json({ message: 'Lead Faculty is already assigned to this college' });
+            }
+            
+            if (!user.colleges) user.colleges = [];
+            user.colleges.push(collegeId);
+            await user.save();
+        } else {
+            isNewUser = true;
+            const password = generatePassword();
+            const nameParts = name ? name.split(' ') : [];
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+            const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
+
+            user = await User.create({
+                name,
+                email,
+                password,
+                role: 'Lead Faculty',
+                colleges: [collegeId],
+                assignedBy: req.user._id,
+                profile: {
+                    firstName,
+                    middleName,
+                    lastName,
+                    institution: college ? college.name : ''
+                }
+            });
+
+            console.log(`📧 Attempting to send email to ${email}...`);
+            emailResult = await sendCredentialsEmail(email, name, password, 'Lead Faculty');
+            console.log(`📧 Email result:`, emailResult);
+        }
 
         // Update College with Lead Faculty
         await College.findByIdAndUpdate(collegeId, { leadFaculty: user._id });
 
-        console.log(`📧 Attempting to send email to ${email}...`);
-        const emailResult = await sendCredentialsEmail(email, name, password, 'Lead Faculty');
-        console.log(`📧 Email result:`, emailResult);
+
 
         res.status(201).json({
-            message: emailResult.success ? 'Lead Faculty added and email sent successfully' : `Lead Faculty added but email failed: ${emailResult.error}`,
+            message: isNewUser 
+                ? (emailResult.success ? 'Lead Faculty added and email sent successfully' : `Lead Faculty added but email failed: ${emailResult.error}`)
+                : 'Existing Lead Faculty successfully assigned to the new college',
             user,
             emailSent: emailResult.success
         });
@@ -82,41 +101,70 @@ const addLeadFaculty = async (req, res) => {
 const addFaculty = async (req, res) => {
     const { name, email, leadFacultyId } = req.body;
     try {
-        const userExists = await User.findOne({ email });
-        if (userExists) {
-            return res.status(400).json({ message: 'User with this email already exists' });
-        }
+        let user = await User.findOne({ email });
+        let emailResult = { success: true };
+        let isNewUser = false;
 
         const leadFaculty = await User.findById(leadFacultyId);
         if (!leadFaculty || leadFaculty.role !== 'Lead Faculty') {
             return res.status(400).json({ message: 'Invalid Lead Faculty ID' });
         }
+        
+        // Use the first college of the lead faculty or require collegeId in req.body
+        const collegeId = req.body.collegeId || (leadFaculty.colleges && leadFaculty.colleges.length > 0 ? leadFaculty.colleges[0] : null);
 
-        const password = generatePassword();
-        const nameParts = name ? name.split(' ') : [];
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
-        const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
-
-        const user = await User.create({
-            name,
-            email,
-            password,
-            role: 'Faculty',
-            leadFaculty: leadFacultyId,
-            college: leadFaculty.college,
-            assignedBy: req.user._id,
-            profile: {
-                firstName,
-                middleName,
-                lastName,
-                institution: leadFaculty.college?.name || ''
+        if (user) {
+            if (user.role !== 'Faculty') {
+                return res.status(400).json({ message: 'User exists but is not a Faculty' });
             }
-        });
+            if (!user.colleges) user.colleges = [];
+            if (!user.leadFaculties) user.leadFaculties = [];
+            
+            if (collegeId && !user.colleges.includes(collegeId)) {
+                user.colleges.push(collegeId);
+            }
+            if (!user.leadFaculties.includes(leadFacultyId)) {
+                user.leadFaculties.push(leadFacultyId);
+            }
+            await user.save();
+        } else {
+            isNewUser = true;
+            const password = generatePassword();
+            const nameParts = name ? name.split(' ') : [];
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+            const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
+            
+            // Get college name for institution
+            let institutionName = '';
+            if (collegeId) {
+                const college = await College.findById(collegeId);
+                institutionName = college ? college.name : '';
+            }
 
-        const emailResult = await sendCredentialsEmail(email, name, password, 'Faculty');
+            user = await User.create({
+                name,
+                email,
+                password,
+                role: 'Faculty',
+                leadFaculties: [leadFacultyId],
+                colleges: collegeId ? [collegeId] : [],
+                assignedBy: req.user._id,
+                profile: {
+                    firstName,
+                    middleName,
+                    lastName,
+                    institution: institutionName
+                }
+            });
+
+            emailResult = await sendCredentialsEmail(email, name, password, 'Faculty');
+        }
+
         res.status(201).json({
-            message: emailResult.success ? 'Faculty added and email sent successfully' : `Faculty added but email failed: ${emailResult.error}`,
+            message: isNewUser 
+                ? (emailResult.success ? 'Faculty added and email sent successfully' : `Faculty added but email failed: ${emailResult.error}`)
+                : 'Existing Faculty successfully assigned to the new Lead Faculty',
             user,
             emailSent: emailResult.success
         });
@@ -144,7 +192,7 @@ const addStudent = async (req, res) => {
         // Find all faculties in the college
         const faculties = await User.find({
             role: 'Faculty',
-            college: collegeId
+            colleges: collegeId
         });
 
         if (faculties.length === 0) {
@@ -179,8 +227,8 @@ const addStudent = async (req, res) => {
             password,
             role: 'Student',
             faculty: facultyWithLeastStudents._id,
-            leadFaculty: facultyWithLeastStudents.leadFaculty,
-            college: collegeId,
+            leadFaculties: college.leadFaculty ? [college.leadFaculty] : [],
+            colleges: [collegeId],
             assignedBy: req.user._id,
             profile: {
                 firstName,
@@ -256,13 +304,13 @@ const getUsers = async (req, res) => {
         const { role, leadFacultyId, facultyId } = req.query;
         let query = {};
         if (role) query.role = role;
-        if (leadFacultyId) query.leadFaculty = leadFacultyId;
+        if (leadFacultyId) query.leadFaculties = leadFacultyId;
         if (facultyId) query.faculty = facultyId;
 
         const users = await User.find(query)
-            .select('name email role college leadFaculty faculty profile points academicAchievements courseReflections beTheChange researchPublications interdisciplinaryCollaboration conferenceParticipation competitionsAwards workshopsTraining clinicalExperiences voluntaryParticipation ethicsThroughArt thoughtsToActions driscollReflections')
-            .populate('college', 'name')
-            .populate('leadFaculty', 'name')
+            .select('name email role colleges leadFaculties faculty profile points academicAchievements courseReflections beTheChange researchPublications interdisciplinaryCollaboration conferenceParticipation competitionsAwards workshopsTraining clinicalExperiences voluntaryParticipation ethicsThroughArt thoughtsToActions driscollReflections')
+            .populate('colleges', 'name')
+            .populate('leadFaculties', 'name')
             .populate('faculty', 'name')
             .populate('driscollReflections');
         res.json(users);
@@ -278,11 +326,11 @@ const getFacultiesByLeadFaculty = async (req, res) => {
         const { leadFacultyId } = req.params;
         const faculties = await User.find({
             role: 'Faculty',
-            leadFaculty: leadFacultyId
+            leadFaculties: leadFacultyId
         })
-            .populate('college', 'name')
-            .populate('leadFaculty', 'name email')
-            .select('name email role college leadFaculty');
+            .populate('colleges', 'name')
+            .populate('leadFaculties', 'name email')
+            .select('name email role colleges leadFaculties');
         res.json(faculties);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -299,8 +347,8 @@ const getStudentsByFaculty = async (req, res) => {
             faculty: facultyId
         })
             .populate('faculty', 'name email')
-            .populate('college', 'name')
-            .select('name email role faculty college profile points academicAchievements courseReflections beTheChange researchPublications interdisciplinaryCollaboration conferenceParticipation competitionsAwards workshopsTraining clinicalExperiences voluntaryParticipation ethicsThroughArt thoughtsToActions');
+            .populate('colleges', 'name')
+            .select('name email role faculty colleges profile points academicAchievements courseReflections beTheChange researchPublications interdisciplinaryCollaboration conferenceParticipation competitionsAwards workshopsTraining clinicalExperiences voluntaryParticipation ethicsThroughArt thoughtsToActions');
         res.json(students);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -317,7 +365,7 @@ const deleteCollege = async (req, res) => {
         }
 
         // Clear college reference in all users
-        await User.updateMany({ college: req.params.id }, { $set: { college: null } });
+        await User.updateMany({ colleges: req.params.id }, { $pull: { colleges: req.params.id } });
 
         await College.findByIdAndDelete(req.params.id);
         res.json({ message: 'College deleted and user references cleared' });
@@ -339,41 +387,46 @@ const deleteUser = async (req, res) => {
 
         // Cleanup based on role
         if (role === 'Lead Faculty') {
-            const collegeId = user.college;
+            const collegeIds = user.colleges || [];
 
-            // 1. Find a potential successor (any regular Faculty in the same college)
-            const successor = await User.findOne({
-                college: collegeId,
-                role: 'Faculty',
-                _id: { $ne: user._id }
-            });
+            for (const collegeId of collegeIds) {
+                // 1. Find a potential successor (any regular Faculty in the same college)
+                const successor = await User.findOne({
+                    colleges: collegeId,
+                    role: 'Faculty',
+                    _id: { $ne: user._id }
+                });
 
-            if (successor) {
-                // 2. Promote the successor to Lead Faculty
-                successor.role = 'Lead Faculty';
-                successor.leadFaculty = null;
-                await successor.save();
+                if (successor) {
+                    // 2. Promote the successor to Lead Faculty
+                    successor.role = 'Lead Faculty';
+                    // We don't remove their other leadFaculties here to avoid breaking other colleges they might belong to
+                    await successor.save();
 
-                // 3. Update the college to point to the new Lead
-                await College.updateMany({ leadFaculty: user._id }, { $set: { leadFaculty: successor._id } });
+                    // 3. Update the college to point to the new Lead
+                    await College.updateMany({ leadFaculty: user._id, _id: collegeId }, { $set: { leadFaculty: successor._id } });
 
-                // 4. Reassign all other faculties and students to report to the new Lead
-                await User.updateMany(
-                    { college: collegeId, leadFaculty: user._id, _id: { $ne: successor._id } },
-                    { $set: { leadFaculty: successor._id } }
-                );
+                    // 4. Reassign all other faculties and students to report to the new Lead
+                    const usersToUpdate = await User.find({ colleges: collegeId, leadFaculties: user._id, _id: { $ne: successor._id } });
+                    for(let u of usersToUpdate) {
+                        u.leadFaculties = u.leadFaculties.filter(id => id.toString() !== user._id.toString());
+                        if(!u.leadFaculties.includes(successor._id)) u.leadFaculties.push(successor._id);
+                        await u.save();
+                    }
 
-                // 5. Transfer specific mentorship: Any students directly under the deleted lead
-                // now report to the new promoted lead.
-                await User.updateMany(
-                    { faculty: user._id },
-                    { $set: { faculty: successor._id } }
-                );
-            } else {
-                // No successor found, clear references as before
-                await College.updateMany({ leadFaculty: user._id }, { $set: { leadFaculty: null } });
-                await User.updateMany({ leadFaculty: user._id }, { $set: { leadFaculty: null } });
+                    // 5. Transfer specific mentorship
+                    await User.updateMany(
+                        { faculty: user._id },
+                        { $set: { faculty: successor._id } }
+                    );
+                } else {
+                    // No successor found, clear references as before
+                    await College.updateMany({ leadFaculty: user._id, _id: collegeId }, { $set: { leadFaculty: null } });
+                    await User.updateMany({ leadFaculties: user._id }, { $pull: { leadFaculties: user._id } });
+                }
             }
+            // Ensure any remaining references are cleared
+            await User.updateMany({ leadFaculties: user._id }, { $pull: { leadFaculties: user._id } });
         } else if (role === 'Faculty') {
             // Clear faculty reference in students
             await User.updateMany({ faculty: user._id }, { $set: { faculty: null } });
@@ -406,7 +459,7 @@ const updateCollegeLead = async (req, res) => {
 
         // 1. Promote new lead
         newLead.role = 'Lead Faculty';
-        newLead.leadFaculty = null;
+        if (!newLead.colleges.includes(req.params.id)) newLead.colleges.push(req.params.id);
         await newLead.save();
 
         // 2. Update college root reference
@@ -414,16 +467,19 @@ const updateCollegeLead = async (req, res) => {
         await college.save();
 
         // 3. Demote ANYONE ELSE who is currently a Lead Faculty for this college
-        // This ensures the exclusivity (Nelson should only be lead faculty)
         const otherLeads = await User.find({
-            college: req.params.id,
+            colleges: req.params.id,
             role: 'Lead Faculty',
             _id: { $ne: newLead._id }
         });
 
         for (let lead of otherLeads) {
-            lead.role = 'Faculty';
-            lead.leadFaculty = newLead._id;
+            // Check if they are leading other colleges. If so, they stay Lead Faculty.
+            const otherCollegesLed = await College.countDocuments({ leadFaculty: lead._id, _id: { $ne: req.params.id } });
+            if (otherCollegesLed === 0) {
+                lead.role = 'Faculty';
+            }
+            if (!lead.leadFaculties.includes(newLead._id)) lead.leadFaculties.push(newLead._id);
             await lead.save();
         }
 

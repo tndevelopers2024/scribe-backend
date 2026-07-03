@@ -8,23 +8,23 @@ const getAssignedStudents = async (req, res) => {
     try {
         let query = { role: 'Student' };
         const userId = req.user._id.toString();
-        const userCollegeId = req.user.college ? req.user.college.toString() : null;
+        const userColleges = req.user.colleges || [];
 
         if (req.user.role === 'Lead Faculty') {
             // Broad search for Lead Faculty:
             // 1. Same college
             // 2. OR assigned explicitly to this Lead
             // 3. OR assigned to a Faculty member who reports to this Lead
-            const subordinateFaculties = await User.find({ leadFaculty: req.user._id }).select('_id');
+            const subordinateFaculties = await User.find({ leadFaculties: req.user._id }).select('_id');
             const subordinateIds = subordinateFaculties.map(f => f._id);
 
             const conditions = [
-                { leadFaculty: req.user._id },
+                { leadFaculties: req.user._id },
                 { faculty: { $in: subordinateIds } }
             ];
 
-            if (userCollegeId) {
-                conditions.push({ college: userCollegeId });
+            if (userColleges.length > 0) {
+                conditions.push({ colleges: { $in: userColleges } });
             }
 
             query = {
@@ -32,7 +32,7 @@ const getAssignedStudents = async (req, res) => {
                 $or: conditions
             };
 
-            console.log(`[DEBUG] Lead Faculty ${req.user.email} querying. College: ${userCollegeId}, Subordinates: ${subordinateIds.length}`);
+            console.log(`[DEBUG] Lead Faculty ${req.user.email} querying. Colleges: ${userColleges.length}, Subordinates: ${subordinateIds.length}`);
         } else if (req.user.role === 'Faculty') {
             query.faculty = req.user._id;
         } else if (req.user.role === 'Super Admin' || req.user.role === 'Admin') {
@@ -43,7 +43,7 @@ const getAssignedStudents = async (req, res) => {
 
         const students = await User.find(query)
             .select('-password')
-            .populate('college', 'name')
+            .populate('colleges', 'name')
             .populate('faculty', 'name');
 
         console.log(`[DEBUG] Found ${students.length} students for ${req.user.email} (${req.user.role})`);
@@ -75,7 +75,7 @@ const getStudentPortfolio = async (req, res) => {
             .populate('thoughtsToActions.reviewedBy', 'name profile.firstName profile.lastName')
             .populate('profile.reviewedBy', 'name profile.firstName profile.lastName')
             .populate('faculty', 'name')
-            .populate('college', 'name');
+            .populate('colleges', 'name');
 
         if (!student) {
             return res.status(404).json({ message: 'Student not found' });
@@ -83,23 +83,23 @@ const getStudentPortfolio = async (req, res) => {
 
         // Authorization check - Use String for robust comparison
         const studentFacultyId = student.faculty?._id ? student.faculty._id.toString() : student.faculty ? student.faculty.toString() : null;
-        const studentLeadFacultyId = student.leadFaculty ? student.leadFaculty.toString() : null;
-        const studentCollegeId = student.college?._id ? student.college._id.toString() : student.college ? student.college.toString() : null;
+        const studentLeadFacultyIds = student.leadFaculties ? student.leadFaculties.map(id => id.toString()) : [];
+        const studentCollegeIds = student.colleges ? student.colleges.map(c => c._id ? c._id.toString() : c.toString()) : [];
 
         const userId = req.user._id.toString();
-        const userCollegeId = req.user.college ? req.user.college.toString() : null;
+        const userColleges = req.user.colleges ? req.user.colleges.map(c => c.toString()) : [];
 
         const isDirectFaculty = studentFacultyId === userId;
-        const isLeadFacultyDirect = studentLeadFacultyId === userId;
+        const isLeadFacultyDirect = studentLeadFacultyIds.includes(userId);
         const isInSameCollege = (req.user.role === 'Lead Faculty' || req.user.role === 'Super Admin' || req.user.role === 'Admin') &&
-            studentCollegeId && userCollegeId && studentCollegeId === userCollegeId;
+            studentCollegeIds.some(id => userColleges.includes(id));
         const isSuperAdmin = req.user.role === 'Super Admin' || req.user.role === 'Admin';
 
         if (!isDirectFaculty && !isInSameCollege && !isLeadFacultyDirect && !isSuperAdmin) {
             console.warn(`[AUTH FAIL] User ${req.user.email} (${req.user.role}) attempted to view student ${student.name}. 
-                College Match: ${isInSameCollege} (St:${studentCollegeId} Usr:${userCollegeId}),
-                Direct Match: ${isDirectFaculty} (StFac:${studentFacultyId} UsrId:${userId}), 
-                Lead Match: ${isLeadFacultyDirect} (StLead:${studentLeadFacultyId} UsrId:${userId})`);
+                College Match: ${isInSameCollege},
+                Direct Match: ${isDirectFaculty}, 
+                Lead Match: ${isLeadFacultyDirect}`);
             return res.status(403).json({ message: 'Not authorized to view this student portfolio' });
         }
 
@@ -148,16 +148,16 @@ const reviewPortfolioItem = async (req, res) => {
 
         // Authorization check - Consistent with view logic
         const studentFacultyId = student.faculty?._id ? student.faculty._id.toString() : student.faculty ? student.faculty.toString() : null;
-        const studentLeadFacultyId = student.leadFaculty ? student.leadFaculty.toString() : null;
-        const studentCollegeId = student.college?._id ? student.college._id.toString() : student.college ? student.college.toString() : null;
+        const studentLeadFacultyIds = student.leadFaculties ? student.leadFaculties.map(id => id.toString()) : [];
+        const studentCollegeIds = student.colleges ? student.colleges.map(c => c._id ? c._id.toString() : c.toString()) : [];
 
         const userId = req.user._id.toString();
-        const userCollegeId = req.user.college ? req.user.college.toString() : null;
+        const userColleges = req.user.colleges ? req.user.colleges.map(c => c.toString()) : [];
 
         const isDirectFaculty = studentFacultyId === userId;
-        const isLeadFacultyDirect = studentLeadFacultyId === userId;
+        const isLeadFacultyDirect = studentLeadFacultyIds.includes(userId);
         const isInSameCollege = (req.user.role === 'Lead Faculty' || req.user.role === 'Super Admin' || req.user.role === 'Admin') &&
-            studentCollegeId && userCollegeId && studentCollegeId === userCollegeId;
+            studentCollegeIds.some(id => userColleges.includes(id));
         const isSuperAdmin = req.user.role === 'Super Admin' || req.user.role === 'Admin';
 
         if (!isDirectFaculty && !isInSameCollege && !isLeadFacultyDirect && !isSuperAdmin) {

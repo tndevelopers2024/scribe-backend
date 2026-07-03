@@ -6,9 +6,9 @@ const getProfile = async (req, res) => {
     try {
         const user = await User.findById(req.user._id)
             .select('-password')
-            .populate('college', 'name')
+            .populate('colleges', 'name')
             .populate('faculty', 'name email')
-            .populate('leadFaculty', 'name email')
+            .populate('leadFaculties', 'name email')
             .populate('academicAchievements.reviewedBy', 'name profile.firstName profile.lastName')
             .populate('courseReflections.reviewedBy', 'name profile.firstName profile.lastName')
             .populate('beTheChange.reviewedBy', 'name profile.firstName profile.lastName')
@@ -65,9 +65,9 @@ const updateProfile = async (req, res) => {
 
         const updatedUser = await User.findById(user._id)
             .select('-password')
-            .populate('college', 'name')
+            .populate('colleges', 'name')
             .populate('faculty', 'name email')
-            .populate('leadFaculty', 'name email')
+            .populate('leadFaculties', 'name email')
             .populate('academicAchievements.reviewedBy', 'name profile.firstName profile.lastName')
             .populate('courseReflections.reviewedBy', 'name profile.firstName profile.lastName')
             .populate('beTheChange.reviewedBy', 'name profile.firstName profile.lastName')

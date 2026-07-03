@@ -14,7 +14,7 @@ const loginUser = async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email }).populate('colleges', 'name');
 
         if (user && (await user.matchPassword(password))) {
             res.json({
@@ -23,7 +23,7 @@ const loginUser = async (req, res) => {
                 email: user.email,
                 role: user.role,
                 isFirstLogin: user.isFirstLogin,
-                college: user.college,
+                colleges: user.colleges,
                 points: user.points || 0,
                 token: generateToken(user._id),
             });

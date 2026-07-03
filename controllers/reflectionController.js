@@ -111,8 +111,11 @@ const reviewDriscollReflection = async (req, res) => {
         // Authorization check (consistent with facultyController review)
         const isSuperAdmin = req.user.role === 'Super Admin' || req.user.role === 'Admin';
         const isDirectFaculty = student.faculty?.toString() === req.user._id.toString();
-        const isLeadFaculty = student.leadFaculty?.toString() === req.user._id.toString();
-        const isSameCollege = (req.user.role === 'Lead Faculty' && student.college?.toString() === req.user.college?.toString());
+        const isLeadFaculty = student.leadFaculties?.some(id => id.toString() === req.user._id.toString());
+        
+        const studentCollegeIds = student.colleges?.map(c => c.toString()) || [];
+        const userCollegeIds = req.user.colleges?.map(c => c.toString()) || [];
+        const isSameCollege = (req.user.role === 'Lead Faculty' && studentCollegeIds.some(id => userCollegeIds.includes(id)));
 
         if (!isSuperAdmin && !isDirectFaculty && !isLeadFaculty && !isSameCollege) {
             return res.status(403).json({ message: 'Not authorized to review this student' });

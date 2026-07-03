@@ -21,18 +21,18 @@ const userSchema = new mongoose.Schema({
         enum: ['Super Admin', 'Admin', 'Lead Faculty', 'Faculty', 'Student', 'Developer'],
         required: true
     },
-    college: {
+    colleges: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'College'
-    },
+    }],
     assignedBy: { // The higher-up who created this user
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     },
-    leadFaculty: { // For role 'Faculty' -> assigned to which Lead Faculty
+    leadFaculties: [{ // For role 'Faculty' -> assigned to which Lead Faculty
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
-    },
+    }],
     faculty: { // For role 'Student' -> assigned to which Faculty
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
