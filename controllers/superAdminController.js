@@ -702,6 +702,28 @@ const confirmBulkStudents = async (req, res) => {
     }
 };
 
+// @desc    Remove a user from a specific college
+// @route   DELETE /api/admin/remove-from-college/:collegeId/user/:userId
+const removeUserFromCollege = async (req, res) => {
+    const { collegeId, userId } = req.params;
+    
+    try {
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        user.colleges = user.colleges.filter(
+            id => id.toString() !== collegeId
+        );
+        
+        await user.save();
+        res.json({ message: 'User safely removed from college' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     addCollege,
     addLeadFaculty,
@@ -717,5 +739,6 @@ module.exports = {
     updateCollegeLead,
     updateFacultyLead,
     previewBulkStudents,
-    confirmBulkStudents
+    confirmBulkStudents,
+    removeUserFromCollege
 };

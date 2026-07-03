@@ -14,7 +14,8 @@ const {
     updateCollegeLead,
     updateFacultyLead,
     previewBulkStudents,
-    confirmBulkStudents
+    confirmBulkStudents,
+    removeUserFromCollege
 } = require('../controllers/superAdminController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const multer = require('multer');
@@ -40,6 +41,7 @@ router.get('/users', authorize('Super Admin', 'Admin', 'Developer'), getUsers);
 // Management routes
 router.delete('/college/:id', authorize('Super Admin', 'Developer'), deleteCollege);
 router.delete('/user/:id', authorize('Super Admin', 'Developer'), deleteUser);
+router.delete('/remove-from-college/:collegeId/user/:userId', authorize('Super Admin', 'Developer'), removeUserFromCollege);
 router.put('/college/:id/lead', authorize('Super Admin', 'Developer'), updateCollegeLead);
 router.put('/user/:id/lead', authorize('Super Admin', 'Developer'), updateFacultyLead);
 
